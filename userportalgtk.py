@@ -29,15 +29,51 @@ class Client:
     def Connect(self, button=None):
         selected_vm = self._cmb_main_vms.get_active_text().split(" :: ")[1]
         ticket, expiry = dispatcher.ticketVm(selected_vm)
+        vm = dispatcher.getVmById(selected_vm)
+        display = vm.get_display()
+        type=display.type_
+        if type == "spice":
 
-        port = "port="+str(self._port)+"&" if self._port else ""
-        sport = "tls-port="+str(self._sport)+"&" if self._sport else ""
+            port = "port="+str(self._port)+"&" if self._port else ""
+            sport = "tls-port="+str(self._sport)+"&" if self._sport else ""
+            uri = "spice://%s/?%s%spassword=%s" % (self._host,
+                                               port,
+                                               sport,
+                                               ticket)
+            cmd = ["spicy", "--uri", uri]
+
+            if self._ca_file is not None:
+                cmd.append("--spice-ca-file=%s" % self._ca_file)
+            subprocess.Popen(cmd)
+        elif type == "vnc":
+            try:
+                vvFile = open("/tmp/console.vv","w")
+                t_vvContent = ["[virt-viewer]\n","type=vnc\n","host={}\n".format(self._host),
+                               "port={}\n".format(self._port),"password={}\n".format(ticket),"delete-this-file=1\n",
+                               "title={}\n".format(self._cmb_main_vms.get_active_text().split(" :: ")[0],
+                                                   "secure-attention=ctral+alt+end"
+                )]
+                vvFile.writelines(t_vvContent)
+            except BaseException, e:
+                self._sta_main.push(0,"error:{}".format(e))
+                return
+            finally:
+                vvFile.close()
+            cmd = ["remote-viewer","/tmp/console.vv"]
+            subprocess.Popen(cmd)
+
+
+    def ConnectOld(self, button=None):
+        selected_vm = self._cmb_main_vms.get_active_text().split(" :: ")[1]
+        ticket, expiry = dispatcher.ticketVm(selected_vm)
+
+        port = "port=" + str(self._port) + "&" if self._port else ""
+        sport = "tls-port=" + str(self._sport) + "&" if self._sport else ""
         uri = "spice://%s/?%s%spassword=%s" % (self._host,
                                                port,
                                                sport,
                                                ticket)
         cmd = ["spicy", "--uri", uri]
-
 
         if self._ca_file is not None:
             cmd.append("--spice-ca-file=%s" % self._ca_file)
